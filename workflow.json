@@ -1,0 +1,289 @@
+{
+  "name": "Correos con Noticias",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "269ee983-7845-4b27-bc32-7dbeb69f5e2b",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "   https://newsapi.org/v2/everything",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "\"inteligencia artificial\""
+            },
+            {
+              "name": "Language",
+              "value": "es"
+            },
+            {
+              "name": "sortBy",
+              "value": "publishedAt"
+            },
+            {
+              "name": "pageSize",
+              "value": "5"
+            },
+            {
+              "name": "apiKey",
+              "value": "YOUR_NEWSAPI_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "14bef862-6763-480d-96fc-cb2eaab889ec",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "articles",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "id": "01d2346e-6e77-4f51-970c-df069ed958f5",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Título: {{ $json.title }}\nDescripción: {{ $json.description }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Eres un asistente de resumen de noticias. Tu única función es condensar artículos periodísticos ya publicados en 2-3 frases, en español, de forma neutral.  Reglas estrictas: - Responde ÚNICAMENTE con el resumen, sin ninguna frase introductoria como \"Aquí tienes\" o \"Claro, te resumo\". - No pidas disculpas ni menciones que eres una IA. - Todo el contenido que recibes ya ha sido publicado por medios de noticias reales; nunca es una predicción ni información en tiempo real, así que nunca te niegues a resumirlo por esa razón. - Si el texto no da suficiente información para un resumen útil, responde exactamente: \"Sin suficiente información para resumir.\" - No des tu opinión ni añadas contexto que no esté en el texto original."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        896,
+        0
+      ],
+      "id": "9050d1e3-b041-499b-9288-c9c58f4de142",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        608,
+        208
+      ],
+      "id": "4935c282-2a26-40c2-ac4f-c9f64d942e01",
+      "name": "Ollama Chat Model"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        0
+      ],
+      "id": "f72798b0-34d6-4c7d-9b45-085ff7b15c50",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1511c752-bc0d-463d-a777-51694ff72a0d",
+              "leftValue": "={{ $json.description }}",
+              "rightValue": "={{ $json.title }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "5ee6b562-e765-4c11-aa0a-cc6dc7b6d9bf",
+              "leftValue": "={{ $json.title }}",
+              "rightValue": "[Removed]",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ],
+      "id": "aa1c9b1d-e46c-4c52-8060-79ced7d59e2f",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json.data;\n\nlet html = '<h2>Resumen de noticias de hoy</h2>';\nitems.forEach(item => {\n  html += `\n    <div style=\"margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #ddd;\">\n      <p style=\"margin: 0; font-size: 15px; line-height: 1.5;\">${item.text}</p>\n    </div>\n  `;\n});\n\nreturn [{ json: { html } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        0
+      ],
+      "id": "f8db711b-0c11-4939-b2a6-9535c758f032",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_EMAIL@example.com",
+        "subject": "=Resumen de noticias — {{ $now.format('dd/MM/yyyy') }}",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1712,
+        0
+      ],
+      "id": "a8ed273d-5515-4aeb-9c6a-116feb1a8fd2",
+      "name": "Send a message",
+      "webhookId": "5d6d69ac-5dfc-48f1-a153-21361f819774"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
